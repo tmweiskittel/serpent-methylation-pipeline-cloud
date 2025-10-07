@@ -21,6 +21,9 @@ import sys
 
 import pandas as pd
 
+GCS_BUCKET_OUT = "gs://weiskittel-projects1/radnecrosis/processed/data"
+GCS_BUCKET_IN = "gs://weiskittel-projects1/radnecrosis/01.DawData"
+
 # Deal with snakemake >8 transition.
 from snakemake import __version__
 if int(__version__.split(".")[0]) < 8:
@@ -39,7 +42,7 @@ DATA_PATH = os.path.join(os.path.dirname(workflow.snakefile), "../data")
 data_config_files = glob.glob(f"{DATA_PATH}/*.csv")
 
 # Uncomment for test runs
-# data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
+#data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
 
 # Only operate on EM-seq files (ignore BS-seq)
 EMSEQ_ONLY = False
@@ -131,7 +134,7 @@ print(f"Parsed {len(all_experiments_data)} total sample files.", file=sys.stderr
 
 # For building a sample list for Snakemake
 ALL_SAMPLES_LIST.extend(all_experiments_data)
-
+all_experiments_df = all_experiments_df.set_index("sample_id")
 
 ###############
 # Snakemake is a little funny.
@@ -139,6 +142,15 @@ ALL_SAMPLES_LIST.extend(all_experiments_data)
 ###############
 rule all:
     input:
+        downloaded = [
+            f"{DATA_PATH}/{sample['experiment']}/{sample['sample_id']}/.downloaded-from-gcs"
+            for sample in ALL_SAMPLES_LIST
+        ],
+        uploaded = [
+            f"{DATA_PATH}/{sample['experiment']}/{sample['sample_id']}/.uploaded-to-gcs"
+            for sample in ALL_SAMPLES_LIST
+        ] if "make-subsampled" not in config else [],
+
         # If you pass the make-subsampled flag, then we'll generate subsampled reads (from the full .fastq)
         r1ss=[
             f"{DATA_PATH}/{sample['experiment']}_subsampled/{sample['sample_id']}/raw/R1.fastq.gz"
@@ -200,27 +212,15 @@ rule mask_reference_fasta:
     conda:
         "envs/env.yaml"
     input:
-        u1af1_exclusion=ancient(
-            storage.http(
-                "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GRCh38_major_release_seqs_for_alignment_pipelines/GCA_000001405.15_GRCh38_GRC_exclusions.bed",
-                keep_local=True,
-            )
-        ),
-        dac_exclusion=ancient(
-            storage.http(
-                "https://encode-public.s3.amazonaws.com/2020/05/05/bc5dcc02-eafb-4471-aba0-4ebc7ee8c3e6/ENCFF356LFX.bed.gz",
-                keep_local=True,
-            )
-        ),
-        reference_genome=ancient(rules.get_reference_genome.output.reference_genome),  # Ancient ignores the mtime: if this file exists, assume we ran.
+        u1af1_exclusion="data/reference/U2AF1-GRCh38-Exclusion.bed",
+        dac_exclusion="data/reference/DAC-Exclusion-List-ENCFF356LFX.bed",
+        reference_genome=ancient(rules.get_reference_genome.output.reference_genome),
     output:
         masked_reference_genome="{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna",
     log:
         maskfasta="{DATA_PATH}/reference/maskfasta.log.txt",
     shell:
         """
-        gunzip -c {input.dac_exclusion} > {DATA_PATH}/reference/DAC-Exclusion-List-ENCFF356LFX.bed
-        cp {input.u1af1_exclusion} {DATA_PATH}/reference/U2AF1-GRCh38-Exclusion.bed
         # maskfasta doesn't work on stdin/stdout, or with gzipped files :/
         # Mask for DAC
         bedtools maskfasta -fi {input.reference_genome} -fo {DATA_PATH}/reference/GRCh38-DAC.fna -bed {DATA_PATH}/reference/DAC-Exclusion-List-ENCFF356LFX.bed >>{log.maskfasta} 2>&1
@@ -329,6 +329,36 @@ rule wgbs_tools_index:
 ###############
 ### Core Pipeline Steps
 ###############
+## pull in data
+rule download_from_gcs:
+    output:
+        # Marker file to indicate download is complete
+        touch(f"{DATA_PATH}/{{experiment}}/{{sample}}/.downloaded-from-gcs")
+    params:
+        bucket=GCS_BUCKET_IN,
+        r1=lambda wildcards: all_experiments_df.loc[wildcards.sample, "path_R1"],
+        r2=lambda wildcards: all_experiments_df.loc[wildcards.sample, "path_R2"]
+    log:
+        f"{DATA_PATH}/{{experiment}}/{{sample}}/logs/gcs-download.log.txt"
+    run:
+        # Create directory
+        sample_dir = f"{DATA_PATH}/{wildcards.experiment}/{wildcards.sample}/raw"
+        os.makedirs(sample_dir, exist_ok=True)
+
+        # Full paths where files will be downloaded
+        r1_file = os.path.join(sample_dir, params.r1)
+        r2_file = os.path.join(sample_dir, params.r2)
+
+        # Only download if missing
+        if not os.path.exists(r1_file):
+            shell(f"gsutil cp {params.bucket}/{wildcards.sample}/{params.r1} {r1_file}")
+        if not os.path.exists(r2_file):
+            shell(f"gsutil cp {params.bucket}/{wildcards.sample}/{params.r2} {r2_file}")
+
+        # Touch marker file
+        shell(f"touch {output}")
+
+
 
 
 ### md5
@@ -336,6 +366,7 @@ rule wgbs_tools_index:
 # This should NOT run on subsampled files
 rule md5sum:
     input:
+        downloaded=f"{DATA_PATH}/{{experiment}}/{{sample}}/.downloaded-from-gcs",
         r1_file=lambda wildcards: ancient("{DATA_PATH}/{experiment}/{sample}/raw/"
         + all_experiments_df.loc[wildcards.sample, "path_R1"]),
         r2_file=lambda wildcards: ancient("{DATA_PATH}/{experiment}/{sample}/raw/"
@@ -477,7 +508,9 @@ rule bwa_meth:
     # On some cluster executions (e.g., LSF/RIS), we need to limit the number of threads a bit, becuase at runtime,
     # if the execution group exceeds the allocation, it's killed. Here, we limit to N-8.
     # The 8 comes from the rest of the thread group: 3 for fastp, 1 for mark nonconverted, 3 for fixmate/sort/markdup
-    threads: lambda x: len(os.sched_getaffinity(0))-8  # All cores but 8
+#    threads: lambda x: len(os.sched_getaffinity(0))-8  # All cores but 8
+    threads:  200
+
     resources:
        mem_mb = 72000
     shell:
@@ -796,7 +829,7 @@ rule wgbs_tools_pat_beta:
         out_dir="{DATA_PATH}/{experiment}/{sample}/wgbs_tools/"
     threads: 8
     shell:
-        "wgbstools bam2pat --genome GRCh38-DAC-U2AF1 --out_dir {params.out_dir} --mbias --verbose --threads {threads} {input.bam} >{log} 2>&1"
+        "wgbstools bam2pat --out_dir {params.out_dir} --mbias --verbose --threads {threads} {input.bam} >{log} 2>&1"
 
 
 
@@ -822,6 +855,24 @@ rule touch_complete_flag:
         """
         touch {params.out_flag}
         curl -H "Priority: low" -d "$HOSTNAME: {params.out_flag}" ntfy.sh/semenko-snakemake
+        """
+rule gcs_upload:
+    input:
+        # Trigger upload only after the sample pipeline completes
+        complete_flag = f"{DATA_PATH}/{{experiment}}/{{sample}}/.pipeline-complete-v2"
+    output:
+        # Touch file so Snakemake knows upload finished
+        touch(f"{DATA_PATH}/{{experiment}}/{{sample}}/.uploaded-to-gcs")
+    params:
+        bucket = GCS_BUCKET_OUT
+    log:
+        f"{DATA_PATH}/{{experiment}}/{{sample}}/logs/gcs-upload.log.txt"
+    shell:
+        """
+        # Mirror the full sample directory into the bucket
+        gsutil -m rsync -r {DATA_PATH}/{wildcards.experiment}/{wildcards.sample} \
+            {params.bucket}/{wildcards.experiment}/{wildcards.sample} \
+            > {log} 2>&1
         """
 
 
