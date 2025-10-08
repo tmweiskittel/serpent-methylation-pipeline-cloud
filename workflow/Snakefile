@@ -36,7 +36,7 @@ if int(__version__.split(".")[0]) < 8:
 from snakemake.workflow import Workflow
 
 # Get full path based on Snakemake location
-DATA_PATH = os.path.join(os.path.dirname(workflow.snakefile), "../data")
+DATA_PATH = os.path.abspath(os.path.join(os.path.dirname(workflow.snakefile), "../data"))
 
 # Loop over the experiment definition files (e.g. melanoma.csv, crc.csv)
 data_config_files = glob.glob(f"{DATA_PATH}/*.csv")
@@ -332,33 +332,40 @@ rule wgbs_tools_index:
 ## pull in data
 rule download_from_gcs:
     output:
-        # Raw reads that will be used by md5sum and fastp
         r1_file=f"{DATA_PATH}/{{experiment}}/{{sample}}/raw/R1.fastq.gz",
         r2_file=f"{DATA_PATH}/{{experiment}}/{{sample}}/raw/R2.fastq.gz",
-        # Marker file to indicate download completion
         marker=touch(f"{DATA_PATH}/{{experiment}}/{{sample}}/.downloaded-from-gcs"),
     params:
         bucket=GCS_BUCKET_IN,
-        r1=lambda wildcards: all_experiments_df.loc[wildcards.sample, "path_R1"],
-        r2=lambda wildcards: all_experiments_df.loc[wildcards.sample, "path_R2"],
+        r1=lambda wc: all_experiments_df.loc[wc.sample, "path_R1"],
+        r2=lambda wc: all_experiments_df.loc[wc.sample, "path_R2"],
     log:
         f"{DATA_PATH}/{{experiment}}/{{sample}}/logs/gcs-download.log.txt"
     run:
-        import os
-        sample_dir = f"{DATA_PATH}/{wildcards.experiment}/{wildcards.sample}/raw"
-        os.makedirs(sample_dir, exist_ok=True)
+        import os, sys, subprocess
 
-        # Fixed names
+        sample_dir = os.path.join(DATA_PATH, wildcards.experiment, wildcards.sample, "raw")
+        os.makedirs(sample_dir, exist_ok=True)
+        print(f"[INFO] Ensured directory exists: {sample_dir}", file=sys.stderr)
+
         r1_out = output.r1_file
         r2_out = output.r2_file
 
-        # Only download if missing
-        if not os.path.exists(r1_out):
-            shell(f"gsutil cp {params.bucket}/{wildcards.sample}/{params.r1} {r1_out}")
-        if not os.path.exists(r2_out):
-            shell(f"gsutil cp {params.bucket}/{wildcards.sample}/{params.r2} {r2_out}")
+        src_r1 = f"{params.bucket}/{wildcards.sample}/{params.r1}"
+        src_r2 = f"{params.bucket}/{wildcards.sample}/{params.r2}"
 
-        shell(f"touch {output.marker}")
+        try:
+            if not os.path.exists(r1_out):
+                subprocess.run(["gsutil", "cp", src_r1, r1_out], check=True)
+            if not os.path.exists(r2_out):
+                subprocess.run(["gsutil", "cp", src_r2, r2_out], check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"[ERROR] gsutil download failed: {e}", file=sys.stderr)
+            raise e
+
+        with open(output.marker, "w") as f:
+            f.write("done\n")
+
 
 
 
