@@ -337,26 +337,27 @@ rule download_from_gcs:
     params:
         bucket=GCS_BUCKET_IN,
         r1=lambda wildcards: all_experiments_df.loc[wildcards.sample, "path_R1"],
-        r2=lambda wildcards: all_experiments_df.loc[wildcards.sample, "path_R2"]
+        r2=lambda wildcards: all_experiments_df.loc[wildcards.sample, "path_R2"],
     log:
         f"{DATA_PATH}/{{experiment}}/{{sample}}/logs/gcs-download.log.txt"
     run:
-        # Create directory
+        import os
         sample_dir = f"{DATA_PATH}/{wildcards.experiment}/{wildcards.sample}/raw"
         os.makedirs(sample_dir, exist_ok=True)
 
-        # Full paths where files will be downloaded
-        r1_file = os.path.join(sample_dir, params.r1)
-        r2_file = os.path.join(sample_dir, params.r2)
+        # Fixed output file names — same for all samples
+        r1_file = os.path.join(sample_dir, "R1.fastq.gz")
+        r2_file = os.path.join(sample_dir, "R2.fastq.gz")
 
-        # Only download if missing
+        # Download from GCS only if missing
         if not os.path.exists(r1_file):
             shell(f"gsutil cp {params.bucket}/{wildcards.sample}/{params.r1} {r1_file}")
         if not os.path.exists(r2_file):
             shell(f"gsutil cp {params.bucket}/{wildcards.sample}/{params.r2} {r2_file}")
 
-        # Touch marker file
+        # Touch marker
         shell(f"touch {output}")
+
 
 
 
@@ -367,28 +368,22 @@ rule download_from_gcs:
 rule md5sum:
     input:
         downloaded=f"{DATA_PATH}/{{experiment}}/{{sample}}/.downloaded-from-gcs",
-        r1_file=lambda wildcards: ancient("{DATA_PATH}/{experiment}/{sample}/raw/"
-        + all_experiments_df.loc[wildcards.sample, "path_R1"]),
-        r2_file=lambda wildcards: ancient("{DATA_PATH}/{experiment}/{sample}/raw/"
-        + all_experiments_df.loc[wildcards.sample, "path_R2"]),
+        r1_file=ancient(f"{DATA_PATH}/{{experiment}}/{{sample}}/raw/R1.fastq.gz"),
+        r2_file=ancient(f"{DATA_PATH}/{{experiment}}/{{sample}}/raw/R2.fastq.gz"),
     output:
-        # We keep these in the raw directory to make it easier to reset/remove runs (rm everything except raw/)
-        checksums="{DATA_PATH}/{experiment}/{sample}/raw/md5.known.txt",
-        validated="{DATA_PATH}/{experiment}/{sample}/raw/md5.validated.txt",
+        checksums=f"{DATA_PATH}/{{experiment}}/{{sample}}/raw/md5.known.txt",
+        validated=f"{DATA_PATH}/{{experiment}}/{{sample}}/raw/md5.validated.txt",
     params:
-        r1_checksum=lambda wildcards: all_experiments_df.loc[
-            wildcards.sample, "md5sum_R1"
-        ],
-        r2_checksum=lambda wildcards: all_experiments_df.loc[
-            wildcards.sample, "md5sum_R2"
-        ],
+        r1_checksum=lambda wildcards: all_experiments_df.loc[wildcards.sample, "md5sum_R1"],
+        r2_checksum=lambda wildcards: all_experiments_df.loc[wildcards.sample, "md5sum_R2"],
         subsampled="subsampled" in config,
-    threads: 25  # Bit of a hack: this is IO bound, try to throttle it a bit
+    threads: 25
     shell:
         """
         echo -e "{params.r1_checksum}\t{input.r1_file}\n{params.r2_checksum}\t{input.r2_file}" > {output.checksums}
         ( [ "{params.subsampled}" = "True" ] && touch {output.validated}) || md5sum --check {output.checksums} > {output.validated}
         """
+
 
 
 ### subsample
