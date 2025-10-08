@@ -142,10 +142,7 @@ all_experiments_df = all_experiments_df.set_index("sample_id")
 ###############
 rule all:
     input:
-        downloaded = [
-            f"{DATA_PATH}/{sample['experiment']}/{sample['sample_id']}/.downloaded-from-gcs"
-            for sample in ALL_SAMPLES_LIST
-        ],
+       
         uploaded = [
             f"{DATA_PATH}/{sample['experiment']}/{sample['sample_id']}/.uploaded-to-gcs"
             for sample in ALL_SAMPLES_LIST
