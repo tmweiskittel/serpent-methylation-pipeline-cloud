@@ -206,49 +206,39 @@ rule get_reference_genome:
 rule mask_reference_fasta:
     conda:
         "envs/env.yaml"
-    input:
-        u1af1_exclusion=f"{DATA_PATH}/reference/U2AF1-GRCh38-Exclusion.bed",
-        dac_exclusion=f"{DATA_PATH}/reference/ENCFF356LFX.bed",
-        reference_genome=ancient(rules.get_reference_genome.output.reference_genome),
-    output:
-        masked_reference_genome=f"{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna",
-    log:
-        maskfasta=f"{DATA_PATH}/reference/maskfasta.log.txt",
     run:
-        import os, sys
+        import os, sys, shutil, subprocess
 
-        # Ensure reference directory exists
+        # Paths to reference files (assume folder already exists)
         ref_dir = os.path.join(DATA_PATH, "reference")
-        os.makedirs(ref_dir, exist_ok=True)
-
-        # Prepare intermediate BED filenames
-        dac_bed = os.path.join(ref_dir, "DAC-Exclusion-List-ENCFF356LFX.bed")
+        reference_genome = os.path.join(ref_dir, "GRCh38.fna")
+        dac_bed = os.path.join(ref_dir, "ENCFF356LFX.bed")
         u2af1_bed = os.path.join(ref_dir, "U2AF1-GRCh38-Exclusion.bed")
 
-        # Copy BED files (optional, ensures consistent naming)
-        import shutil
-        shutil.copy(input.dac_exclusion, dac_bed)
-        shutil.copy(input.u1af1_exclusion, u2af1_bed)
-
-        # Intermediate masked genome
+        # Prepare intermediate and output files
         dac_masked_genome = os.path.join(ref_dir, "GRCh38-DAC.fna")
+        masked_reference_genome = os.path.join(ref_dir, "GRCh38-DAC-U2AF1.fna")
+        log_file = os.path.join(ref_dir, "maskfasta.log.txt")
 
-        # Run bedtools commands and capture logs
-        import subprocess
-        with open(log.maskfasta, "w") as logf:
-            print(f"[INFO] Masking DAC regions from {input.reference_genome}", file=sys.stderr)
+        # Copy BED files to consistent names (optional)
+        shutil.copy(dac_bed, os.path.join(ref_dir, "DAC-Exclusion-List-ENCFF356LFX.bed"))
+        shutil.copy(u2af1_bed, os.path.join(ref_dir, "U2AF1-GRCh38-Exclusion.bed"))
+
+        # Run bedtools and capture log
+        with open(log_file, "w") as logf:
+            print(f"[INFO] Masking DAC regions from {reference_genome}", file=sys.stderr)
             subprocess.run(
-                ["bedtools", "maskfasta", "-fi", input.reference_genome, "-fo", dac_masked_genome, "-bed", dac_bed],
+                ["bedtools", "maskfasta", "-fi", reference_genome, "-fo", dac_masked_genome, "-bed", dac_bed],
                 check=True, stdout=logf, stderr=subprocess.STDOUT
             )
 
             print(f"[INFO] Masking U2AF1 regions from {dac_masked_genome}", file=sys.stderr)
             subprocess.run(
-                ["bedtools", "maskfasta", "-fi", dac_masked_genome, "-fo", output.masked_reference_genome, "-bed", u2af1_bed],
+                ["bedtools", "maskfasta", "-fi", dac_masked_genome, "-fo", masked_reference_genome, "-bed", u2af1_bed],
                 check=True, stdout=logf, stderr=subprocess.STDOUT
             )
 
-        print(f"[INFO] Masked reference genome created at {output.masked_reference_genome}", file=sys.stderr)
+        print(f"[INFO] Masked reference genome created at {masked_reference_genome}", file=sys.stderr)
 
 
 ###############
