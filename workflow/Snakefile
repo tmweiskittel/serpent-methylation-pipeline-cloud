@@ -206,6 +206,10 @@ rule get_reference_genome:
 rule mask_reference_fasta:
     conda:
         "envs/env.yaml"
+    output:
+        masked_reference_genome=f"{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna"
+    log:
+        maskfasta=f"{DATA_PATH}/reference/maskfasta.log.txt"    
     run:
         import os, sys, shutil, subprocess
 
