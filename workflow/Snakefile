@@ -365,19 +365,11 @@ rule download_from_gcs:
             f.write("done\n")
         print(f"[INFO] Download complete for sample {wildcards.sample}", file=sys.stderr)
 
-
-
-
-
-
-
-
 ### md5
 # Validate checksums
 # This should NOT run on subsampled files
 rule md5sum:
     input:
-        downloaded=f"{DATA_PATH}/{{experiment}}/{{sample}}/.downloaded-from-gcs",
         r1_file=rules.download_from_gcs.output.r1_file,
         r2_file=rules.download_from_gcs.output.r2_file,
     output:
