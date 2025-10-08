@@ -334,7 +334,7 @@ rule download_from_gcs:
     output:
         r1_file=f"{DATA_PATH}/{{experiment}}/{{sample}}/raw/R1.fastq.gz",
         r2_file=f"{DATA_PATH}/{{experiment}}/{{sample}}/raw/R2.fastq.gz",
-        marker=f"{DATA_PATH}/{{experiment}}/{{sample}}/.downloaded-from-gcs",
+        # marker removed from output
     params:
         bucket=GCS_BUCKET_IN,
         r1=lambda wc: all_experiments_df.loc[wc.sample, "path_R1"],
@@ -344,21 +344,27 @@ rule download_from_gcs:
     run:
         import os, sys, subprocess
 
-        # Explicitly create raw/ directory
+        # create directories first
         sample_raw_dir = os.path.join(DATA_PATH, wildcards.experiment, wildcards.sample, "raw")
         os.makedirs(sample_raw_dir, exist_ok=True)
-        print(f"[INFO] Created raw dir: {sample_raw_dir}", file=sys.stderr)
+        log_dir = os.path.dirname(log[0])
+        os.makedirs(log_dir, exist_ok=True)
 
-        # Download files
+        print(f"[INFO] raw dir: {sample_raw_dir}", file=sys.stderr)
+        print(f"[INFO] log dir: {log_dir}", file=sys.stderr)
+
+        # download files
         for src_name, dest_file in [(params.r1, output.r1_file), (params.r2, output.r2_file)]:
             src = f"{params.bucket}/{wildcards.sample}/{src_name}"
-            if not os.path.exists(dest_file):
-                print(f"[INFO] Downloading {src} -> {dest_file}", file=sys.stderr)
-                subprocess.run(["gsutil", "cp", src, dest_file], check=True)
+            print(f"[INFO] Downloading {src} -> {dest_file}", file=sys.stderr)
+            subprocess.run(["gsutil", "cp", src, dest_file], check=True)
 
-        # Touch marker at the end
-        with open(output.marker, "w") as f:
+        # create marker at the end
+        marker_file = os.path.join(DATA_PATH, wildcards.experiment, wildcards.sample, ".downloaded-from-gcs")
+        with open(marker_file, "w") as f:
             f.write("done\n")
+        print(f"[INFO] Download complete for sample {wildcards.sample}", file=sys.stderr)
+
 
 
 
