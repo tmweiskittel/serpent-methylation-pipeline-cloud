@@ -22,7 +22,7 @@ import sys
 import pandas as pd
 
 GCS_BUCKET_OUT = "gs://weiskittel-projects1/radnecrosis/processed/data"
-GCS_BUCKET_IN = "gs://weiskittel-projects1/radnecrosis/01.DawData"
+GCS_BUCKET_IN = "gs://weiskittel-projects1/radnecrosis/01.RawData"
 
 # Deal with snakemake >8 transition.
 from snakemake import __version__
@@ -351,8 +351,10 @@ rule download_from_gcs:
         print(f"[INFO] log dir: {log_dir}", file=sys.stderr)
 
         # download files
-        for src_name, dest_file in [(params.r1, output.r1_file), (params.r2, output.r2_file)]:
-            src = f"{params.bucket}/{wildcards.sample}/{src_name}"
+        for src_path, dest_file in [(params.r1, output.r1_file), (params.r2, output.r2_file)]:
+            # Use only the filename to avoid repeating folders
+            filename = os.path.basename(src_path)
+            src = f"{params.bucket}/{wildcards.sample}/{filename}"
             print(f"[INFO] Downloading {src} -> {dest_file}", file=sys.stderr)
             subprocess.run(["gsutil", "cp", src, dest_file], check=True)
 
@@ -361,6 +363,7 @@ rule download_from_gcs:
         with open(marker_file, "w") as f:
             f.write("done\n")
         print(f"[INFO] Download complete for sample {wildcards.sample}", file=sys.stderr)
+
 
 ### md5
 # Validate checksums
