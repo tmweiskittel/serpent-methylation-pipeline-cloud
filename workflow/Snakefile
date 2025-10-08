@@ -509,7 +509,7 @@ rule bwa_meth:
     # if the execution group exceeds the allocation, it's killed. Here, we limit to N-8.
     # The 8 comes from the rest of the thread group: 3 for fastp, 1 for mark nonconverted, 3 for fixmate/sort/markdup
 #    threads: lambda x: len(os.sched_getaffinity(0))-8  # All cores but 8
-    threads:  200
+    threads:  40
 
     resources:
        mem_mb = 72000
