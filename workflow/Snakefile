@@ -332,8 +332,11 @@ rule wgbs_tools_index:
 ## pull in data
 rule download_from_gcs:
     output:
-        # Marker file to indicate download is complete
-        touch(f"{DATA_PATH}/{{experiment}}/{{sample}}/.downloaded-from-gcs")
+        # Raw reads that will be used by md5sum and fastp
+        r1_file=f"{DATA_PATH}/{{experiment}}/{{sample}}/raw/R1.fastq.gz",
+        r2_file=f"{DATA_PATH}/{{experiment}}/{{sample}}/raw/R2.fastq.gz",
+        # Marker file to indicate download completion
+        marker=touch(f"{DATA_PATH}/{{experiment}}/{{sample}}/.downloaded-from-gcs"),
     params:
         bucket=GCS_BUCKET_IN,
         r1=lambda wildcards: all_experiments_df.loc[wildcards.sample, "path_R1"],
@@ -345,18 +348,18 @@ rule download_from_gcs:
         sample_dir = f"{DATA_PATH}/{wildcards.experiment}/{wildcards.sample}/raw"
         os.makedirs(sample_dir, exist_ok=True)
 
-        # Fixed output file names — same for all samples
-        r1_file = os.path.join(sample_dir, "R1.fastq.gz")
-        r2_file = os.path.join(sample_dir, "R2.fastq.gz")
+        # Fixed names
+        r1_out = output.r1_file
+        r2_out = output.r2_file
 
-        # Download from GCS only if missing
-        if not os.path.exists(r1_file):
-            shell(f"gsutil cp {params.bucket}/{wildcards.sample}/{params.r1} {r1_file}")
-        if not os.path.exists(r2_file):
-            shell(f"gsutil cp {params.bucket}/{wildcards.sample}/{params.r2} {r2_file}")
+        # Only download if missing
+        if not os.path.exists(r1_out):
+            shell(f"gsutil cp {params.bucket}/{wildcards.sample}/{params.r1} {r1_out}")
+        if not os.path.exists(r2_out):
+            shell(f"gsutil cp {params.bucket}/{wildcards.sample}/{params.r2} {r2_out}")
 
-        # Touch marker
-        shell(f"touch {output}")
+        shell(f"touch {output.marker}")
+
 
 
 
@@ -368,8 +371,8 @@ rule download_from_gcs:
 rule md5sum:
     input:
         downloaded=f"{DATA_PATH}/{{experiment}}/{{sample}}/.downloaded-from-gcs",
-        r1_file=ancient(f"{DATA_PATH}/{{experiment}}/{{sample}}/raw/R1.fastq.gz"),
-        r2_file=ancient(f"{DATA_PATH}/{{experiment}}/{{sample}}/raw/R2.fastq.gz"),
+        r1_file=rules.download_from_gcs.output.r1_file,
+        r2_file=rules.download_from_gcs.output.r2_file,
     output:
         checksums=f"{DATA_PATH}/{{experiment}}/{{sample}}/raw/md5.known.txt",
         validated=f"{DATA_PATH}/{{experiment}}/{{sample}}/raw/md5.validated.txt",
@@ -383,7 +386,6 @@ rule md5sum:
         echo -e "{params.r1_checksum}\t{input.r1_file}\n{params.r2_checksum}\t{input.r2_file}" > {output.checksums}
         ( [ "{params.subsampled}" = "True" ] && touch {output.validated}) || md5sum --check {output.checksums} > {output.validated}
         """
-
 
 
 ### subsample
