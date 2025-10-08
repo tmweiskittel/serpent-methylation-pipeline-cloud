@@ -204,45 +204,37 @@ rule get_reference_genome:
 # U2AF1 masking file details: https://genomeref.blogspot.com/2021/07/one-of-these-things-doest-belong.html
 # Encode DAC Exclusion List details: https://www.encodeproject.org/annotations/ENCSR636HFF/
 rule mask_reference_fasta:
+    # TODO: Consider a more modular env definition? (one per rule / rule group?)
     conda:
         "envs/env.yaml"
+    input:
+        u1af1_exclusion=ancient(
+            storage.http(
+                "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GRCh38_major_release_seqs_for_alignment_pipelines/GCA_000001405.15_GRCh38_GRC_exclusions.bed",
+                keep_local=True,
+            )
+        ),
+        dac_exclusion=ancient(
+            storage.http(
+                "https://encode-public.s3.amazonaws.com/2020/05/05/bc5dcc02-eafb-4471-aba0-4ebc7ee8c3e6/ENCFF356LFX.bed.gz",
+                keep_local=True,
+            )
+        ),
+        reference_genome=ancient(rules.get_reference_genome.output.reference_genome),  # Ancient ignores the mtime: if this file exists, assume we ran.
     output:
-        masked_reference_genome=f"{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna"
+        masked_reference_genome="{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna",
     log:
-        maskfasta=f"{DATA_PATH}/reference/maskfasta.log.txt"    
-    run:
-        import os, sys, shutil, subprocess
-
-        # Paths to reference files (assume folder already exists)
-        ref_dir = os.path.join(DATA_PATH, "reference")
-        reference_genome = os.path.join(ref_dir, "GRCh38.fna")
-        dac_bed = os.path.join(ref_dir, "ENCFF356LFX.bed")
-        u2af1_bed = os.path.join(ref_dir, "U2AF1-GRCh38-Exclusion.bed")
-
-        # Prepare intermediate and output files
-        dac_masked_genome = os.path.join(ref_dir, "GRCh38-DAC.fna")
-        masked_reference_genome = os.path.join(ref_dir, "GRCh38-DAC-U2AF1.fna")
-        log_file = os.path.join(ref_dir, "maskfasta.log.txt")
-
-        # Copy BED files to consistent names (optional)
-        shutil.copy(dac_bed, os.path.join(ref_dir, "DAC-Exclusion-List-ENCFF356LFX.bed"))
-        shutil.copy(u2af1_bed, os.path.join(ref_dir, "U2AF1-GRCh38-Exclusion.bed"))
-
-        # Run bedtools and capture log
-        with open(log_file, "w") as logf:
-            print(f"[INFO] Masking DAC regions from {reference_genome}", file=sys.stderr)
-            subprocess.run(
-                ["bedtools", "maskfasta", "-fi", reference_genome, "-fo", dac_masked_genome, "-bed", dac_bed],
-                check=True, stdout=logf, stderr=subprocess.STDOUT
-            )
-
-            print(f"[INFO] Masking U2AF1 regions from {dac_masked_genome}", file=sys.stderr)
-            subprocess.run(
-                ["bedtools", "maskfasta", "-fi", dac_masked_genome, "-fo", masked_reference_genome, "-bed", u2af1_bed],
-                check=True, stdout=logf, stderr=subprocess.STDOUT
-            )
-
-        print(f"[INFO] Masked reference genome created at {masked_reference_genome}", file=sys.stderr)
+        maskfasta="{DATA_PATH}/reference/maskfasta.log.txt",
+    shell:
+        """
+        gunzip -c {input.dac_exclusion} > {DATA_PATH}/reference/DAC-Exclusion-List-ENCFF356LFX.bed
+        cp {input.u1af1_exclusion} {DATA_PATH}/reference/U2AF1-GRCh38-Exclusion.bed
+        # maskfasta doesn't work on stdin/stdout, or with gzipped files :/
+        # Mask for DAC
+        bedtools maskfasta -fi {input.reference_genome} -fo {DATA_PATH}/reference/GRCh38-DAC.fna -bed {DATA_PATH}/reference/DAC-Exclusion-List-ENCFF356LFX.bed >>{log.maskfasta} 2>&1
+        # Mask for U2AF1
+        bedtools maskfasta -fi {DATA_PATH}/reference/GRCh38-DAC.fna -fo {output.masked_reference_genome} -bed {DATA_PATH}/reference/U2AF1-GRCh38-Exclusion.bed >>{log.maskfasta} 2>&1
+        """
 
 
 ###############
