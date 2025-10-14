@@ -21,6 +21,10 @@ import sys
 
 import pandas as pd
 
+# setting directories for temp files onto mounted data disk
+shell.prefix("export TMPDIR=/mnt/data/tmp; ")
+os.environ["TMPDIR"] = "/mnt/data/tmp"
+
 GCS_BUCKET_OUT = "gs://weiskittel-projects1/radnecrosis/processed/data"
 GCS_BUCKET_IN = "gs://weiskittel-projects1/radnecrosis/01.RawData"
 
