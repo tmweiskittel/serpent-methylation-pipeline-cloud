@@ -209,8 +209,8 @@ rule get_reference_genome:
 # Encode DAC Exclusion List details: https://www.encodeproject.org/annotations/ENCSR636HFF/
 rule mask_reference_fasta:
     # TODO: Consider a more modular env definition? (one per rule / rule group?)
-    conda:
-        "envs/env.yaml"
+    #conda:
+     #   "envs/env.yaml"
     input:
         u1af1_exclusion=ancient(
             storage.http(
@@ -249,8 +249,8 @@ rule mask_reference_fasta:
 # Runs once to generate biscuit indices
 # NOTE: Not referenced currently, as we aren't calling SNVs w/ biscuit
 rule biscuit_index:
-    conda:
-        "envs/env.yaml"
+    #conda:
+        #"envs/env.yaml"
     input:
         masked_reference_genome=ancient(
             rules.mask_reference_fasta.output.masked_reference_genome
@@ -272,8 +272,8 @@ rule biscuit_index:
 ### biscuit QC index
 # Runs once for the post-alignent QC tools (parsed by multiqc)
 rule biscuit_qc_index:
-    conda:
-        "envs/env.yaml"  # TODO: Add perl for this? (bleh)
+    #conda:
+     #   "envs/env.yaml"  # TODO: Add perl for this? (bleh)
     input:
         biscuit_index=ancient(rules.biscuit_index.output),
         masked_reference_genome=ancient(
@@ -296,8 +296,8 @@ rule biscuit_qc_index:
 
 ### bwameth index (using bwa-mem2)
 rule bwa_meth_index:
-    conda:
-        "envs/env.yaml"
+    #conda:
+    #    "envs/env.yaml"
     input:
         masked_reference_genome = ancient(rules.mask_reference_fasta.output.masked_reference_genome)
     output:
@@ -317,7 +317,7 @@ rule bwa_meth_index:
 # wgbs_tools index
 # Note we assume you pre-built wgbs_tools
 rule wgbs_tools_index:
-    conda: "envs/env.yaml"
+    #conda: "envs/env.yaml"
     input:
         reference = rules.mask_reference_fasta.output.masked_reference_genome
     output:
@@ -406,8 +406,8 @@ rule md5sum:
 # This rule only executes if you do NOT set the subsampled flag -- it generates parallel experiment
 # directories consisting of subsampled reads to perform rapid analyses.
 rule seqtk_subsample:
-    conda:
-        "envs/env.yaml"
+    #conda:
+     #   "envs/env.yaml"
     input:
         md5_sums=ancient(rules.md5sum.output.validated),
         r1_file=rules.md5sum.input.r1_file,
@@ -444,8 +444,8 @@ rule seqtk_subsample:
 rule fastp:
     group:
         "align_core"
-    conda:
-        "envs/env.yaml"
+   #conda:
+    #    "envs/env.yaml"
     input:
         md5_sums=ancient(rules.md5sum.output.validated),
         r1_file=rules.md5sum.input.r1_file,
@@ -501,8 +501,8 @@ rule fastp:
 rule bwa_meth:
     group:
         "align_core"
-    conda:
-        "envs/env.yaml"
+   #conda:
+    #    "envs/env.yaml"
     input:
         input_fasta = "{DATA_PATH}/{experiment}/{sample}/fastp/interleaved.fa",
         reference_genome = rules.mask_reference_fasta.output.masked_reference_genome,
@@ -563,8 +563,8 @@ rule bwa_meth:
 rule mark_nonconverted:
     group:
         "align_core"
-    conda:
-        "envs/env.yaml"
+   # conda:
+    #    "envs/env.yaml"
     input:
         aligned_sam="{DATA_PATH}/{experiment}/{sample}/samtools/raw.sam",
         reference_genome=rules.mask_reference_fasta.output.masked_reference_genome,
@@ -588,8 +588,8 @@ rule mark_nonconverted:
 rule samtools_fixmate_sort_markdup:
     group:
         "align_core"
-    conda:
-        "envs/env.yaml"
+    #conda:
+     #   "envs/env.yaml"
     input:
         mark_nonconv=rules.mark_nonconverted.output,
     output:
@@ -628,8 +628,8 @@ rule samtools_fixmate_sort_markdup:
 
 ### samtools index
 rule samtools_index:
-    conda:
-        "envs/env.yaml"
+  #  conda:
+   #     "envs/env.yaml"
     input:
         rules.samtools_fixmate_sort_markdup.output.bam,
     output:
@@ -643,8 +643,8 @@ rule samtools_index:
 
 ### samtools statistics
 rule samtools_statistics:
-    conda:
-        "envs/env.yaml"
+   # conda:
+    #    "envs/env.yaml"
     input:
         bam=rules.samtools_fixmate_sort_markdup.output.bam,
         # Note: we can operate on the .csi index above, but I worry there's a race where
@@ -671,8 +671,8 @@ rule samtools_statistics:
 # We make this one long pipe, since the .vcf is enormous (~10GB/alignment), and we don't need to keep it around.
 # NOTE: mergecg expects a sorted .bed -- I'm pretty sure the sort here is unnecessary, but it's cheap enough.
 rule biscuit_bed:
-    conda:
-        "envs/env.yaml"
+   # conda:
+    #    "envs/env.yaml"
     input:
         bam=rules.samtools_fixmate_sort_markdup.output.bam,
         masked_reference_genome=ancient(
@@ -713,8 +713,8 @@ rule biscuit_bed:
 # TODO: Investigate pairwise mode?
 # NOTE: Temporarily disabled
 rule biscuit_epiread:
-    conda:
-        "envs/env.yaml"
+  #  conda:
+   #     "envs/env.yaml"
     input:
         bam=rules.samtools_fixmate_sort_markdup.output.bam,
         masked_reference_genome=ancient(
@@ -741,8 +741,8 @@ rule biscuit_epiread:
 ### biscuit QC script
 # Usage: QC.sh [-h,--help] [-s,--single-end] [-v,--vcf] [-o,--outdir] [-k,--keep-tmp-files] [-n,--no-cov-qc] assets_directory genome sample_name in_bam
 rule biscuit_qc:
-    conda:
-        "envs/env.yaml"
+ #   conda:
+  #      "envs/env.yaml"
     input:
         bam=rules.samtools_fixmate_sort_markdup.output.bam,
         masked_reference_genome=ancient(
@@ -764,8 +764,8 @@ rule biscuit_qc:
 
 ### MethylDackel mbias
 rule methyldackel_mbias_plots:
-    conda:
-        "envs/env.yaml"
+   # conda:
+    #    "envs/env.yaml"
     input:
         bam=rules.samtools_fixmate_sort_markdup.output.bam,
         reference=rules.mask_reference_fasta.output.masked_reference_genome,
@@ -785,8 +785,8 @@ rule methyldackel_mbias_plots:
 
 ### FastQC stats
 rule fastqc_bam:
-    conda:
-        "envs/env.yaml"
+  #  conda:
+   #     "envs/env.yaml"
     input:
         rules.samtools_fixmate_sort_markdup.output.bam,
     output:
@@ -805,8 +805,8 @@ rule fastqc_bam:
 
 ### goleft indexcov
 rule goleft_indexcov:
-    conda:
-        "envs/env.yaml"
+  #  conda:
+   #     "envs/env.yaml"
     input:
         bam=rules.samtools_fixmate_sort_markdup.output.bam,
         index=rules.samtools_index.output,
@@ -823,8 +823,8 @@ rule goleft_indexcov:
 
 ### wgbs_tools pat/beta file formats
 rule wgbs_tools_pat_beta:
-    conda:
-        "envs/env.yaml"
+    #conda:
+     #   "envs/env.yaml"
     input:
         # index=rules.wgbs_tools_index.output, # Temporarily assume pre-built index.
         bam=rules.samtools_fixmate_sort_markdup.output.bam,
@@ -847,8 +847,8 @@ rule wgbs_tools_pat_beta:
 ### Run Aggregator
 # Note: This pan-dependency ensures all other jobs are run.
 rule touch_complete_flag:
-    conda:
-        "envs/env.yaml"
+   # conda:
+    #    "envs/env.yaml"
     input:
         # rules.biscuit_epiread.output,
         rules.biscuit_bed.output,
@@ -890,8 +890,8 @@ rule gcs_upload:
 ### multiqc
 # Across an entire experiment/project, not per-sample or batch
 rule multiqc:
-    conda:
-        "envs/env.yaml"
+    #conda:
+     #   "envs/env.yaml"
     input:
         rules.all.input.multiqc,
     output:
