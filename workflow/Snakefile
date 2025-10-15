@@ -310,7 +310,7 @@ rule bwa_meth_index:
     log:
         index = "{DATA_PATH}/reference/bwameth_bwa-mem2-index.log.txt"
     shell:
-        "python -m bwameth index-mem2 {input.masked_reference_genome} > {log.index} 2>&1"
+        "bwameth.py index-mem2 {input.masked_reference_genome} > {log.index} 2>&1"
 
 
 ### wgbs_tools
