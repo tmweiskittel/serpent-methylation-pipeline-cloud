@@ -749,9 +749,9 @@ rule :
         ),
         biscuit_qc_index=f"{DATA_PATH}/reference/biscuit_qc/",
         index=rules.samtools_index.output,
-        biscuit_qc_index=rules.biscuit_qc_index.output.cpg,
-        biscuit_qc_index=rules.biscuit_qc_index.output.top10,
-        biscuit_qc_index=rules.biscuit_qc_index.output.bot10,
+        biscuit_qc_index1=rules.biscuit_qc_index.output.cpg,
+        biscuit_qc_index2=rules.biscuit_qc_index.output.top10,
+        biscuit_qc_index3=rules.biscuit_qc_index.output.bot10,
 
     output:
         f"{DATA_PATH}" + "/{experiment}/{sample}/biscuit/{sample}_cv_table.txt",  # This makes *tons* of output, but this is the last file generated.
