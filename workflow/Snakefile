@@ -754,11 +754,11 @@ rule biscuit_qc:
         biscuit_qc_index3=rules.biscuit_qc_index.output.bot10,
 
     output:
-        f"{DATA_PATH}" + "/{experiment}/{sample}/biscuit/{sample}_cv_table.txt",  # This makes *tons* of output, but this is the last file generated.
+        f"{DATA_PATH}"/{{experiment}}/{{sample}}/biscuit/{{sample}}_cv_table.txt",  # This makes *tons* of output, but this is the last file generated.
     log:
-        f"{DATA_PATH}" + "/{experiment}/{sample}/logs/biscuit_qc.log.txt",
+        f"{DATA_PATH}"/{{experiment}}/{{sample}}/logs/biscuit_qc.log.txt",
     params:
-        out_dir=f"{DATA_PATH}" + "/{experiment}/{sample}/biscuit/",
+        out_dir=f"{DATA_PATH}"/{{experiment}}/{{sample}}/biscuit/",
         sample_str="{sample}",
     threads: 1
     shell:
