@@ -22,8 +22,8 @@ import sys
 import pandas as pd
 
 # setting directories for temp files onto mounted data disk
-shell.prefix("export TMPDIR=/mnt/data/tmp; ")
-os.environ["TMPDIR"] = "/mnt/data/tmp"
+shell.prefix("export TMPDIR=/home/jupyter/tmp; ")
+os.environ["TMPDIR"] = "/home/jupyter/tmp"
 
 GCS_BUCKET_OUT = "gs://weiskittel-projects1/radnecrosis/processed/data"
 GCS_BUCKET_IN = "gs://weiskittel-projects1/radnecrosis/01.RawData"
@@ -280,10 +280,10 @@ rule biscuit_qc_index:
             rules.mask_reference_fasta.output.masked_reference_genome
         ),
     output:
-        "{DATA_PATH}/reference/biscuit_qc/cpg.bed.gz",
-        "{DATA_PATH}/reference/biscuit_qc/windows100bp.gc_content.bot10p.bed.gz",
-        "{DATA_PATH}/reference/biscuit_qc/windows100bp.gc_content.top10p.bed.gz",
-        path="{DATA_PATH}/reference/biscuit_qc/",
+        f"{DATA_PATH}/reference/biscuit_qc/cpg.bed.gz",
+        f"{DATA_PATH}/reference/biscuit_qc/windows100bp.gc_content.bot10p.bed.gz",
+        f"{DATA_PATH}/reference/biscuit_qc/windows100bp.gc_content.top10p.bed.gz",
+        path=f"{DATA_PATH}/reference/biscuit_qc/",
     log:
         "{DATA_PATH}/reference/biscuit_qc/biscuit_qc.log.txt",
     params:
