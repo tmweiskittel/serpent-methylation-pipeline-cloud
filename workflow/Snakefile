@@ -283,7 +283,6 @@ rule biscuit_qc_index:
         cpg=f"{DATA_PATH}/reference/biscuit_qc/cpg.bed.gz",
         bot10=f"{DATA_PATH}/reference/biscuit_qc/windows100bp.gc_content.bot10p.bed.gz",
         top10=f"{DATA_PATH}/reference/biscuit_qc/windows100bp.gc_content.top10p.bed.gz",
-        path=f"{DATA_PATH}/reference/biscuit_qc/",
     log:
         f"{DATA_PATH}/reference/biscuit_qc/biscuit_qc.log.txt",
     params:
@@ -740,7 +739,7 @@ rule biscuit_epiread:
 
 ### biscuit QC script
 # Usage: QC.sh [-h,--help] [-s,--single-end] [-v,--vcf] [-o,--outdir] [-k,--keep-tmp-files] [-n,--no-cov-qc] assets_directory genome sample_name in_bam
-rule biscuit_qc:
+rule :
  #   conda:
   #      "envs/env.yaml"
     input:
@@ -748,14 +747,18 @@ rule biscuit_qc:
         masked_reference_genome=ancient(
             rules.mask_reference_fasta.output.masked_reference_genome
         ),
-        biscuit_qc_index=rules.biscuit_qc_index.output.path,
+        biscuit_qc_index=f"{DATA_PATH}/reference/biscuit_qc/",
         index=rules.samtools_index.output,
+        biscuit_qc_index=rules.biscuit_qc_index.output.cpg,
+        biscuit_qc_index=rules.biscuit_qc_index.output.top10,
+        biscuit_qc_index=rules.biscuit_qc_index.output.bot10,
+
     output:
-        "{DATA_PATH}/{experiment}/{sample}/biscuit/{sample}_cv_table.txt",  # This makes *tons* of output, but this is the last file generated.
+        f"{DATA_PATH}" + "/{experiment}/{sample}/biscuit/{sample}_cv_table.txt",  # This makes *tons* of output, but this is the last file generated.
     log:
-        "{DATA_PATH}/{experiment}/{sample}/logs/biscuit_qc.log.txt",
+        f"{DATA_PATH}" + "/{experiment}/{sample}/logs/biscuit_qc.log.txt",
     params:
-        out_dir="{DATA_PATH}/{experiment}/{sample}/biscuit/",
+        out_dir=f"{DATA_PATH}" + "/{experiment}/{sample}/biscuit/",
         sample_str="{sample}",
     threads: 1
     shell:
