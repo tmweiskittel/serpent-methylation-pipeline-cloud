@@ -739,7 +739,7 @@ rule biscuit_epiread:
 
 ### biscuit QC script
 # Usage: QC.sh [-h,--help] [-s,--single-end] [-v,--vcf] [-o,--outdir] [-k,--keep-tmp-files] [-n,--no-cov-qc] assets_directory genome sample_name in_bam
-rule :
+rule biscuit_qc:
  #   conda:
   #      "envs/env.yaml"
     input:
