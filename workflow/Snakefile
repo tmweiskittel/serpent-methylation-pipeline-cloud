@@ -873,14 +873,14 @@ rule touch_complete_flag:
 rule gcs_upload:
     input:
         # Trigger upload only after the sample pipeline completes
-        complete_flag = f"{DATA_PATH}/{{experiment}}/{{sample}}/.pipeline-complete-v2"
+        complete_flag = "{DATA_PATH}/{experiment}/{sample}/.pipeline-complete-v2"
     output:
         # Touch file so Snakemake knows upload finished
-        touch(f"{DATA_PATH}/{{experiment}}/{{sample}}/.uploaded-to-gcs")
+        touch("{DATA_PATH}/{experiment}/{sample}/.uploaded-to-gcs")
     params:
         bucket = GCS_BUCKET_OUT
     log:
-        f"{DATA_PATH}/{{experiment}}/{{sample}}/logs/gcs-upload.log.txt"
+        "{DATA_PATH}/{experiment}/{sample}/logs/gcs-upload.log.txt"
     shell:
         """
         # Mirror the full sample directory into the bucket
