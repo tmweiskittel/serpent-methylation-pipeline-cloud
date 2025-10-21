@@ -280,9 +280,9 @@ rule biscuit_qc_index:
             rules.mask_reference_fasta.output.masked_reference_genome
         ),
     output:
-        "{DATA_PATH}/reference/biscuit_qc/cpg.bed.gz",
-        "{DATA_PATH}/reference/biscuit_qc/windows100bp.gc_content.bot10p.bed.gz",
-        "{DATA_PATH}/reference/biscuit_qc/windows100bp.gc_content.top10p.bed.gz",
+        cpg="{DATA_PATH}/reference/biscuit_qc/cpg.bed.gz",
+        bot10="{DATA_PATH}/reference/biscuit_qc/windows100bp.gc_content.bot10p.bed.gz",
+        top10="{DATA_PATH}/reference/biscuit_qc/windows100bp.gc_content.top10p.bed.gz",
     log:
         "{DATA_PATH}/reference/biscuit_qc/biscuit_qc.log.txt",
     params:
