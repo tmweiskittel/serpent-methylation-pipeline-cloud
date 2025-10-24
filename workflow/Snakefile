@@ -747,7 +747,7 @@ rule biscuit_qc:
         masked_reference_genome=ancient(
             rules.mask_reference_fasta.output.masked_reference_genome
         ),
-        biscuit_qc_index="{DATA_PATH}/reference/biscuit_qc/",
+        
         index=rules.samtools_index.output,
         biscuit_qc_index1=rules.biscuit_qc_index.output.cpg,
         biscuit_qc_index2=rules.biscuit_qc_index.output.top10,
@@ -760,9 +760,10 @@ rule biscuit_qc:
     params:
         out_dir="{DATA_PATH}/{experiment}/{sample}/biscuit/",
         sample_str="{sample}",
+        biscuit_qc_index="{DATA_PATH}/reference/biscuit_qc/",
     threads: 1
     shell:
-        "QC.sh --outdir {params.out_dir} {input.biscuit_qc_index} {input.masked_reference_genome} {params.sample_str} {input.bam} >{log} 2>&1"
+        "QC.sh --outdir {params.out_dir} {params.biscuit_qc_index} {input.masked_reference_genome} {params.sample_str} {input.bam} >{log} 2>&1"
 
 
 ### MethylDackel mbias
